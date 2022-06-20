@@ -250,21 +250,5 @@ class ReducerTestCase11(unittest.TestCase):
                                            "test_data" + os.sep + "test_result_3.csv", shallow=False))
 
 
-def suite():
-    s = unittest.TestSuite()
-    s.addTest(ReducerTestCase01())
-    s.addTest(ReducerTestCase02())
-    s.addTest(ReducerTestCase03())
-    s.addTest(ReducerTestCase04())
-    s.addTest(ReducerTestCase05())
-    s.addTest(ReducerTestCase06())
-    s.addTest(ReducerTestCase07())
-    s.addTest(ReducerTestCase08())
-    s.addTest(ReducerTestCase09())
-    s.addTest(ReducerTestCase10())
-    s.addTest(ReducerTestCase11())
-    return s
-
-
 if __name__ == "__main__":
-    unittest.TextTestRunner().run(suite())
+    unittest.main()

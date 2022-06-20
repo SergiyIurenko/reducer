@@ -1,0 +1,23 @@
+FROM python:3.8.13-slim-buster
+
+ENV REDUCER_INPUT_DIR=/app/inbound
+ENV REDUCER_OUTPUT_DIR=/app/outbound
+ENV REDUCER_RUNNERS_QTY=1
+ENV REDUCER_LOW_RUNNER=1
+ENV REDUCER_HIGH_RUNNER=1
+ENV REDUCER_MODE=reduce_collect
+ENV REDUCER_BATCH_SIZE=250000
+ENV REDUCER_COMPACT_AT=1000000
+ENV LOG_LEVEL=DEBUG
+
+RUN apt update && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+
+ADD reducer.py /app
+ADD requirements.txt /app
+ADD test_suite.py /app
+ADD test_data /app/test_data
+RUN mkdir /app/inbound
+RUN mkdir /app/outbound
+RUN pip install --upgrade --no-cache-dir pip && pip install --no-cache-dir -r /app/requirements.txt
+RUN python /app/test_suite.py

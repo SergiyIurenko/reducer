@@ -6,17 +6,14 @@ import logging as lg
 import socket
 
 
-def get_logger_handler(level):
-    handler = logging.StreamHandler()
-    handler.setLevel(level)
-    handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s:   %(message)s"))
-    return handler
-
-
 def get_logger(name, level):
     logger = lg.getLogger(name)
     logger.setLevel(level)
-    logger.addHandler(get_logger_handler(level))
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        handler.setLevel(level)
+        handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s:   %(message)s"))
+        logger.addHandler(handler)
     return logger
 
 
@@ -102,6 +99,7 @@ class Runner(mp.Process):
             result = self.compactor(result)
         self.save_result(result)
         self.logger.debug("Runner complete")
+
     def save_result(self, dataset):
         result_name = self.cfg["output_dir"] + os.sep + ".Combined_" + str(self.runner_id) + ".csv"
         if dataset is None:
@@ -110,7 +108,8 @@ class Runner(mp.Process):
                 os.unlink(result_name)
         else:
             self.logger.debug("Saving result")
-            dataset.to_csv(self.cfg["output_dir"] + os.sep + ".Combined_" + str(self.runner_id) + ".csv", index=False)
+            dataset.to_csv(self.cfg["output_dir"] + os.sep + ".Combined_" + str(self.runner_id) + ".csv", index=False,
+                           line_terminator="\n")
 
 
 if __name__ == "__main__":
@@ -168,6 +167,6 @@ if __name__ == "__main__":
         else:
             logger.debug("Postprocessing and saving collected result")
             compact_data(result).sort_values(by="Source IP", key=lambda x: x.apply(sorting_key), ignore_index=True).\
-                to_csv(cfg["output_dir"] + os.sep + ".Combined.csv", index=False)
+                to_csv(cfg["output_dir"] + os.sep + ".Combined.csv", index=False, line_terminator="\n")
             os.replace(cfg["output_dir"] + os.sep + ".Combined.csv", cfg["output_dir"] + os.sep + "Combined.csv")
     logger.debug("Coordinator complete")
