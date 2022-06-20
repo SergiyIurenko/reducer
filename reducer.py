@@ -3,7 +3,7 @@ import pandas as pd
 import os
 import multiprocessing as mp
 import logging as lg
-import unittest
+import socket
 
 
 def get_logger_handler(level):
@@ -18,6 +18,14 @@ def get_logger(name, level):
     logger.setLevel(level)
     logger.addHandler(get_logger_handler(level))
     return logger
+
+
+def is_valid_ip(addr):
+    try:
+        socket.inet_aton(addr)
+        return True
+    except socket.error:
+        return False
 
 
 def sorting_key(ip):
@@ -54,13 +62,13 @@ class Runner(mp.Process):
             for file in files:
                 if self.is_valid_file(file):
                     if (n % self.cfg["runners_qty"]) == self.runner_id:
-                        self.logger.debug("File picked for processing: " + folder + os.sep + file)
+                        self.logger.debug("File peeked for processing: " + folder + os.sep + file)
                         yield folder + os.sep + file
                     else:
                         self.logger.debug("File of another runner: " + folder + os.sep + file)
                     n += 1
                 else:
-                    self.logger.debug("File ignorred: " + folder + os.sep + file)
+                    self.logger.debug("File ignored: " + folder + os.sep + file)
 
     def env_from_file(self, file):
         return " ".join(file.split(os.sep)[-1].split(".csv")[0].split(" ")[:2])
@@ -68,12 +76,16 @@ class Runner(mp.Process):
     def data_reader(self):
         for file in self.file_enumerator():
             self.logger.debug("Processing file " + file)
-            for chunk in pd.read_csv(file, usecols=["Source IP"],
-                                     engine="c",
-                                     chunksize=self.cfg["batch_size"],
-                                     on_bad_lines="skip"):
-                chunk["Environment"] = self.env_from_file(file)
-                yield chunk
+            try:
+                for chunk in pd.read_csv(file, usecols=["Source IP"], na_filter=False,
+                                         dtype={"Source IP": str}, engine="c",
+                                         chunksize=self.cfg["batch_size"],
+                                         on_bad_lines="skip"):
+                    chunk = chunk[chunk["Source IP"].apply(is_valid_ip)]
+                    chunk["Environment"] = self.env_from_file(file)
+                    yield chunk
+            except Exception as e:
+                self.logger.warning("File " + file + " ignored due to error: " + str(e))
 
     def run(self) -> None:
         self.logger = get_logger("Runner [" + str(self.runner_id + 1) + "]", self.cfg["log_level"])
@@ -117,7 +129,13 @@ if __name__ == "__main__":
     logger = get_logger("Coordinator [" + str(cfg["low_runner"]) + ".." + str(cfg["high_runner"]) + "]",
                         cfg["log_level"])
     logger.debug("Config = " + str(cfg))
+    if not os.path.isdir(cfg["output_dir"]):
+        logger.critical("Output directory do not exist")
+        quit(2)
     if cfg["mode"] in ["reduce", "reduce_collect"]:
+        if not os.path.isdir(cfg["input_dir"]):
+            logger.critical("Input directory do not exist")
+            quit(1)
         logger.info("Reduction started")
         runners = []
         for i in range(cfg["low_runner"] - 1, cfg["high_runner"]):
