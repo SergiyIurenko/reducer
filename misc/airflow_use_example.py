@@ -3,6 +3,8 @@ from datetime import datetime
 from airflow.providers.docker.operators.docker import DockerOperator
 from docker.types import Mount, DriverConfig
 from airflow.operators.dummy_operator import DummyOperator
+from airflow.utils.trigger_rule import TriggerRule
+
 
 with models.DAG(
         "reducer_use_example",
@@ -149,7 +151,8 @@ with models.DAG(
                 ],
         tty=True,
         task_id="Collector",
-        dag=dag
+        dag=dag,
+        trigger_rule=TriggerRule.ALL_SUCCESS
     )
 
     head = DummyOperator(task_id="Start", dag=dag)
