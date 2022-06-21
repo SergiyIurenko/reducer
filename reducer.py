@@ -12,14 +12,14 @@ def get_logger(name: str, level: str) -> lg.Logger:
 
        Please refine this function to fit your logging infrastructure e.g. add handler from pygelf to feed Graylog.
     """
-    logger = lg.getLogger(name)
-    logger.setLevel(level)
-    if not logger.handlers:
+    lgr = lg.getLogger(name)
+    lgr.setLevel(level)
+    if not lgr.handlers:
         handler = logging.StreamHandler()
         handler.setLevel(level)
         handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s:   %(message)s"))
-        logger.addHandler(handler)
-    return logger
+        lgr.addHandler(handler)
+    return lgr
 
 
 def is_valid_ip(addr: str) -> bool:
@@ -77,7 +77,7 @@ class Runner(mp.Process):
                     return True
         return False
 
-    def file_enumerator(self) -> Generator[int, None, None]:
+    def file_enumerator(self) -> Generator[str, None, None]:
         """Generator yielding file names to process by this specific runner. File names are taken from 'input_dir'
            recursive walk-through, from files with valid names it yields by index [runner_id, runner_id +
            1 x runners_qty, runner_id + 2 x runners_qty, ...]
@@ -137,17 +137,17 @@ class Runner(mp.Process):
         """
         self.logger = get_logger("Runner [" + str(self.runner_id + 1) + "]", self.cfg["log_level"])
         self.logger.debug("Runner started")
-        result = None
+        part_result = None
         for data_chunk in self.data_reader():
-            if result is None:
-                result = data_chunk
+            if part_result is None:
+                part_result = data_chunk
             else:
-                result = pd.concat([result, data_chunk], ignore_index=True)
-            if len(result.index) > self.cfg["compact_at"]:
-                result = self.compactor(result)
-        if result is not None:
-            result = self.compactor(result)
-        self.save_result(result)
+                part_result = pd.concat([part_result, data_chunk], ignore_index=True)
+            if len(part_result.index) > self.cfg["compact_at"]:
+                part_result = self.compactor(part_result)
+        if part_result is not None:
+            part_result = self.compactor(part_result)
+        self.save_result(part_result)
         self.logger.debug("Runner complete")
 
     def save_result(self, dataset: pd.DataFrame) -> None:
@@ -192,9 +192,9 @@ if __name__ == "__main__":
         logger.critical("Output directory do not exist")
         quit(2)
     if cfg["runners_qty"] < 1 or \
-       cfg["low_runner"] > cfg["high_runner"] or \
-       cfg["low_runner"] > cfg["runners_qty"] or \
-       cfg["high_runner"] > cfg["runners_qty"]:
+            cfg["low_runner"] > cfg["high_runner"] or \
+            cfg["low_runner"] > cfg["runners_qty"] or \
+            cfg["high_runner"] > cfg["runners_qty"]:
         logger.critical("Invalid runner ID configuration")
         quit(3)
 
@@ -222,7 +222,7 @@ if __name__ == "__main__":
             part_name = cfg["output_dir"] + os.sep + ".Combined_" + str(i) + ".csv"
             if os.path.isfile(part_name):
                 logger.debug("Collecting part " + part_name)
-                result_part =  pd.read_csv(part_name)
+                result_part = pd.read_csv(part_name)
                 if result is None:
                     result = result_part
                 else:
@@ -238,7 +238,7 @@ if __name__ == "__main__":
                 os.unlink(cfg["output_dir"] + os.sep + "Combined.csv")
         else:
             logger.debug("Postprocessing and saving collected result")
-            compact_data(result).sort_values(by="Source IP", key=lambda x: x.apply(sorting_key), ignore_index=True).\
+            compact_data(result).sort_values(by="Source IP", key=lambda x: x.apply(sorting_key), ignore_index=True). \
                 to_csv(cfg["output_dir"] + os.sep + ".Combined.csv", index=False, line_terminator="\n")
             os.replace(cfg["output_dir"] + os.sep + ".Combined.csv", cfg["output_dir"] + os.sep + "Combined.csv")
     logger.info("Coordinator complete")
